@@ -1,0 +1,510 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>GRID DECONSTRUCTION</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@300;400;500&display=swap');
+
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  :root {
+    --bg: #f5f3ee;
+    --fg: #0e0e0c;
+    --dim: #8a8880;
+    --faint: #c8c6c0;
+    --accent: #0e0e0c;
+  }
+
+  body {
+    background: var(--bg);
+    color: var(--fg);
+    font-family: 'IBM Plex Mono', monospace;
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+  }
+
+  header {
+    padding: 20px 28px 16px;
+    border-bottom: 0.5px solid var(--faint);
+    display: flex;
+    align-items: baseline;
+    gap: 20px;
+    flex-wrap: wrap;
+  }
+
+  header h1 {
+    font-size: 11px;
+    font-weight: 400;
+    letter-spacing: 0.15em;
+    color: var(--dim);
+    text-transform: uppercase;
+  }
+
+  header span {
+    font-size: 10px;
+    color: var(--faint);
+    letter-spacing: 0.05em;
+  }
+
+  .controls {
+    padding: 14px 28px;
+    border-bottom: 0.5px solid var(--faint);
+    display: flex;
+    gap: 24px;
+    flex-wrap: wrap;
+    align-items: center;
+  }
+
+  .ctrl {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+
+  .ctrl label {
+    font-size: 9px;
+    letter-spacing: 0.12em;
+    color: var(--dim);
+    text-transform: uppercase;
+    white-space: nowrap;
+    min-width: 60px;
+  }
+
+  .ctrl input[type=range] {
+    -webkit-appearance: none;
+    width: 90px;
+    height: 1px;
+    background: var(--faint);
+    outline: none;
+    cursor: pointer;
+  }
+
+  .ctrl input[type=range]::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    width: 10px;
+    height: 10px;
+    background: var(--fg);
+    border-radius: 50%;
+    cursor: pointer;
+  }
+
+  .ctrl .val {
+    font-size: 9px;
+    color: var(--dim);
+    min-width: 24px;
+    text-align: right;
+  }
+
+  .presets {
+    padding: 12px 28px;
+    border-bottom: 0.5px solid var(--faint);
+    display: flex;
+    gap: 8px;
+    flex-wrap: wrap;
+    align-items: center;
+  }
+
+  .presets span {
+    font-size: 9px;
+    letter-spacing: 0.12em;
+    color: var(--dim);
+    text-transform: uppercase;
+    margin-right: 4px;
+  }
+
+  button {
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 9px;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    padding: 5px 12px;
+    border: 0.5px solid var(--faint);
+    background: transparent;
+    color: var(--dim);
+    cursor: pointer;
+    transition: all 0.15s;
+  }
+
+  button:hover {
+    border-color: var(--fg);
+    color: var(--fg);
+  }
+
+  button.active {
+    border-color: var(--fg);
+    color: var(--fg);
+    background: var(--fg);
+    color: var(--bg);
+  }
+
+  .canvas-wrap {
+    flex: 1;
+    padding: 28px;
+    display: flex;
+    justify-content: center;
+    align-items: flex-start;
+  }
+
+  canvas {
+    display: block;
+    max-width: 900px;
+    width: 100%;
+    cursor: crosshair;
+  }
+
+  footer {
+    padding: 12px 28px;
+    border-top: 0.5px solid var(--faint);
+    display: flex;
+    gap: 16px;
+    align-items: center;
+    flex-wrap: wrap;
+  }
+
+  footer button {
+    padding: 5px 14px;
+  }
+
+  .footer-info {
+    font-size: 9px;
+    color: var(--faint);
+    letter-spacing: 0.08em;
+    margin-left: auto;
+  }
+
+  .divider {
+    width: 0.5px;
+    height: 16px;
+    background: var(--faint);
+  }
+</style>
+</head>
+<body>
+
+<header>
+  <h1>Grid Deconstruction</h1>
+  <span>drag to interact — click to randomize single cell</span>
+</header>
+
+<div class="presets">
+  <span>Preset —</span>
+  <button class="active" onclick="preset('order')">Order</button>
+  <button onclick="preset('tension')">Tension</button>
+  <button onclick="preset('fracture')">Fracture</button>
+  <button onclick="preset('collapse')">Collapse</button>
+  <button onclick="preset('after')">After</button>
+  <div class="divider"></div>
+  <button onclick="randomizeAll()">Randomize</button>
+  <button onclick="animate()">Animate ↻</button>
+</div>
+
+<div class="controls">
+  <div class="ctrl">
+    <label>Cols</label>
+    <input type="range" id="cols" min="2" max="20" value="8" oninput="draw()">
+    <span class="val" id="cols-v">8</span>
+  </div>
+  <div class="ctrl">
+    <label>Rows</label>
+    <input type="range" id="rows" min="2" max="20" value="8" oninput="draw()">
+    <span class="val" id="rows-v">8</span>
+  </div>
+  <div class="ctrl">
+    <label>Chaos</label>
+    <input type="range" id="chaos" min="0" max="100" value="0" oninput="draw()">
+    <span class="val" id="chaos-v">0</span>
+  </div>
+  <div class="ctrl">
+    <label>Rotation</label>
+    <input type="range" id="rotation" min="0" max="100" value="0" oninput="draw()">
+    <span class="val" id="rotation-v">0</span>
+  </div>
+  <div class="ctrl">
+    <label>Scale var</label>
+    <input type="range" id="scale" min="0" max="100" value="0" oninput="draw()">
+    <span class="val" id="scale-v">0</span>
+  </div>
+  <div class="ctrl">
+    <label>Opacity var</label>
+    <input type="range" id="opacity" min="0" max="100" value="0" oninput="draw()">
+    <span class="val" id="opacity-v">0</span>
+  </div>
+  <div class="ctrl">
+    <label>Line weight</label>
+    <input type="range" id="weight" min="1" max="30" value="5" oninput="draw()">
+    <span class="val" id="weight-v">0.5</span>
+  </div>
+  <div class="ctrl">
+    <label>Cell fill</label>
+    <input type="range" id="fill" min="0" max="100" value="0" oninput="draw()">
+    <span class="val" id="fill-v">0</span>
+  </div>
+</div>
+
+<div class="canvas-wrap">
+  <canvas id="c"></canvas>
+</div>
+
+<footer>
+  <button onclick="saveImage()">Export PNG</button>
+  <button onclick="draw()">Redraw</button>
+  <span class="footer-info" id="info">—</span>
+</footer>
+
+<script>
+let animFrame = null;
+let animating = false;
+let animT = 0;
+let seed = Math.random() * 10000;
+
+function seededRnd(s) {
+  const x = Math.sin(s) * 10000;
+  return x - Math.floor(x);
+}
+
+function rnd2(s, scale) {
+  return (seededRnd(s) - 0.5) * 2 * scale;
+}
+
+function getVal(id) {
+  const v = parseFloat(document.getElementById(id).value);
+  const el = document.getElementById(id + '-v');
+  if (el) {
+    if (id === 'weight') el.textContent = (v / 10).toFixed(1);
+    else el.textContent = Math.round(v);
+  }
+  return v;
+}
+
+function preset(name) {
+  document.querySelectorAll('.presets button').forEach(b => b.classList.remove('active'));
+  event.target.classList.add('active');
+  const p = {
+    order:    { cols:8, rows:8, chaos:0,  rotation:0,  scale:0,  opacity:0,  weight:5,  fill:0  },
+    tension:  { cols:8, rows:8, chaos:18, rotation:15, scale:20, opacity:10, weight:5,  fill:5  },
+    fracture: { cols:8, rows:8, chaos:45, rotation:40, scale:50, opacity:30, weight:8,  fill:15 },
+    collapse: { cols:8, rows:8, chaos:80, rotation:75, scale:70, opacity:60, weight:12, fill:30 },
+    after:    { cols:6, rows:6, chaos:25, rotation:20, scale:30, opacity:20, weight:4,  fill:60 },
+  };
+  const s = p[name];
+  for (const [k, v] of Object.entries(s)) {
+    document.getElementById(k).value = v;
+  }
+  seed = Math.random() * 10000;
+  draw();
+}
+
+function randomizeAll() {
+  document.getElementById('chaos').value = Math.random() * 100;
+  document.getElementById('rotation').value = Math.random() * 100;
+  document.getElementById('scale').value = Math.random() * 100;
+  document.getElementById('opacity').value = Math.random() * 100;
+  document.getElementById('fill').value = Math.random() * 80;
+  document.getElementById('weight').value = Math.random() * 25 + 2;
+  seed = Math.random() * 10000;
+  draw();
+}
+
+function animate() {
+  if (animating) {
+    animating = false;
+    cancelAnimationFrame(animFrame);
+    return;
+  }
+  animating = true;
+  animT = 0;
+  const startChaos = parseFloat(document.getElementById('chaos').value);
+  const startRot = parseFloat(document.getElementById('rotation').value);
+
+  function step() {
+    if (!animating) return;
+    animT += 0.008;
+    const t = (Math.sin(animT) + 1) / 2;
+    document.getElementById('chaos').value = t * 90;
+    document.getElementById('rotation').value = t * 80;
+    document.getElementById('scale').value = t * 60;
+    document.getElementById('opacity').value = t * 50;
+    seed += 0.3;
+    draw();
+    animFrame = requestAnimationFrame(step);
+  }
+  step();
+}
+
+function draw() {
+  if (animating) {} 
+
+  const canvas = document.getElementById('c');
+  const wrap = canvas.parentElement;
+  const W = Math.min(wrap.offsetWidth - 56, 900);
+  const H = Math.round(W * 0.75);
+  canvas.width = W * 2;
+  canvas.height = H * 2;
+  canvas.style.width = W + 'px';
+  canvas.style.height = H + 'px';
+  const ctx = canvas.getContext('2d');
+  ctx.scale(2, 2);
+
+  const cols = Math.round(getVal('cols'));
+  const rows = Math.round(getVal('rows'));
+  const chaosAmt = getVal('chaos') / 100;
+  const rotAmt = getVal('rotation') / 100;
+  const scaleAmt = getVal('scale') / 100;
+  const opacityAmt = getVal('opacity') / 100;
+  const lineWeight = getVal('weight') / 10;
+  const fillAmt = getVal('fill') / 100;
+
+  ctx.clearRect(0, 0, W, H);
+
+  const pad = 30;
+  const gW = W - pad * 2;
+  const gH = H - pad * 2;
+  const cellW = gW / cols;
+  const cellH = gH / rows;
+
+  // build displaced node positions
+  const nodes = [];
+  for (let r = 0; r <= rows; r++) {
+    nodes.push([]);
+    for (let c = 0; c <= cols; c++) {
+      const bx = pad + c * cellW;
+      const by = pad + r * cellH;
+      const si = seed + r * 100 + c;
+      const dx = rnd2(si * 1.1, cellW * chaosAmt * 0.7);
+      const dy = rnd2(si * 2.3, cellH * chaosAmt * 0.7);
+      nodes[r].push({ x: bx + dx, y: by + dy });
+    }
+  }
+
+  // draw cell fills
+  if (fillAmt > 0) {
+    for (let r = 0; r < rows; r++) {
+      for (let c = 0; c < cols; c++) {
+        const si = seed + r * 100 + c + 500;
+        const cellFill = seededRnd(si * 3.7) * fillAmt;
+        if (cellFill > 0.05) {
+          const tl = nodes[r][c];
+          const tr = nodes[r][c+1];
+          const bl = nodes[r+1][c];
+          const br = nodes[r+1][c+1];
+          ctx.beginPath();
+          ctx.moveTo(tl.x, tl.y);
+          ctx.lineTo(tr.x, tr.y);
+          ctx.lineTo(br.x, br.y);
+          ctx.lineTo(bl.x, bl.y);
+          ctx.closePath();
+          ctx.fillStyle = '#0e0e0c';
+          ctx.globalAlpha = cellFill * 0.12;
+          ctx.fill();
+          ctx.globalAlpha = 1;
+        }
+      }
+    }
+  }
+
+  // draw grid lines
+  for (let r = 0; r <= rows; r++) {
+    for (let c = 0; c <= cols; c++) {
+      const si = seed + r * 100 + c;
+      const baseOpacity = 1 - opacityAmt * seededRnd(si * 5.1) * 0.9;
+
+      // horizontal line
+      if (c < cols) {
+        const n1 = nodes[r][c];
+        const n2 = nodes[r][c+1];
+
+        // scale variation on individual segments
+        let sx1 = n1.x, sy1 = n1.y, sx2 = n2.x, sy2 = n2.y;
+        if (scaleAmt > 0) {
+          const cx = (sx1 + sx2) / 2;
+          const cy = (sy1 + sy2) / 2;
+          const sv = 1 - scaleAmt * seededRnd(si * 7.3) * 0.6;
+          sx1 = cx + (sx1 - cx) * sv;
+          sy1 = cy + (sy1 - cy) * sv;
+          sx2 = cx + (sx2 - cx) * sv;
+          sy2 = cy + (sy2 - cy) * sv;
+        }
+
+        // rotation on segment
+        if (rotAmt > 0) {
+          const cx = (sx1 + sx2) / 2;
+          const cy = (sy1 + sy2) / 2;
+          const angle = rnd2(si * 9.1, Math.PI * 0.5 * rotAmt);
+          const cos = Math.cos(angle), sin = Math.sin(angle);
+          const rx1 = cos*(sx1-cx) - sin*(sy1-cy) + cx;
+          const ry1 = sin*(sx1-cx) + cos*(sy1-cy) + cy;
+          const rx2 = cos*(sx2-cx) - sin*(sy2-cy) + cx;
+          const ry2 = sin*(sx2-cx) + cos*(sy2-cy) + cy;
+          sx1=rx1; sy1=ry1; sx2=rx2; sy2=ry2;
+        }
+
+        ctx.beginPath();
+        ctx.moveTo(sx1, sy1);
+        ctx.lineTo(sx2, sy2);
+        ctx.strokeStyle = '#0e0e0c';
+        ctx.globalAlpha = Math.max(0.04, baseOpacity);
+        ctx.lineWidth = lineWeight;
+        ctx.stroke();
+        ctx.globalAlpha = 1;
+      }
+
+      // vertical line
+      if (r < rows) {
+        const n1 = nodes[r][c];
+        const n2 = nodes[r+1][c];
+
+        let sx1 = n1.x, sy1 = n1.y, sx2 = n2.x, sy2 = n2.y;
+        if (scaleAmt > 0) {
+          const cx = (sx1 + sx2) / 2;
+          const cy = (sy1 + sy2) / 2;
+          const sv = 1 - scaleAmt * seededRnd((si+50) * 7.3) * 0.6;
+          sx1 = cx + (sx1 - cx) * sv;
+          sy1 = cy + (sy1 - cy) * sv;
+          sx2 = cx + (sx2 - cx) * sv;
+          sy2 = cy + (sy2 - cy) * sv;
+        }
+
+        if (rotAmt > 0) {
+          const cx = (sx1 + sx2) / 2;
+          const cy = (sy1 + sy2) / 2;
+          const angle = rnd2((si+50) * 9.1, Math.PI * 0.5 * rotAmt);
+          const cos = Math.cos(angle), sin = Math.sin(angle);
+          const rx1 = cos*(sx1-cx) - sin*(sy1-cy) + cx;
+          const ry1 = sin*(sx1-cx) + cos*(sy1-cy) + cy;
+          const rx2 = cos*(sx2-cx) - sin*(sy2-cy) + cx;
+          const ry2 = sin*(sx2-cx) + cos*(sy2-cy) + cy;
+          sx1=rx1; sy1=ry1; sx2=rx2; sy2=ry2;
+        }
+
+        ctx.beginPath();
+        ctx.moveTo(sx1, sy1);
+        ctx.lineTo(sx2, sy2);
+        ctx.strokeStyle = '#0e0e0c';
+        ctx.globalAlpha = Math.max(0.04, baseOpacity);
+        ctx.lineWidth = lineWeight;
+        ctx.stroke();
+        ctx.globalAlpha = 1;
+      }
+    }
+  }
+
+  document.getElementById('info').textContent =
+    `${cols} × ${rows} — chaos ${Math.round(chaosAmt*100)}% — seed ${Math.round(seed)}`;
+}
+
+function saveImage() {
+  const canvas = document.getElementById('c');
+  const link = document.createElement('a');
+  link.download = 'grid-deconstruction.png';
+  link.href = canvas.toDataURL('image/png');
+  link.click();
+}
+
+window.addEventListener('load', () => { draw(); });
+window.addEventListener('resize', () => { draw(); });
+</script>
+</body>
+</html>
