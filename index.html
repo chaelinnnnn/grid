@@ -362,8 +362,15 @@ function draw() {
   const ctx = canvas.getContext('2d');
   ctx.scale(2, 2);
 
-  const cols = Math.round(getVal('cols'));
-  const rows = Math.round(getVal('rows'));
+  let cols = Math.round(getVal('cols'));
+  let rows = Math.round(getVal('rows'));
+  // if both are 0 we'll handle below as empty frame
+  // if only one is 0, treat that dimension as 1 (no internal split in that axis)
+  const bothZero = (cols === 0 && rows === 0);
+  if (!bothZero) {
+    if (cols === 0) cols = 1;
+    if (rows === 0) rows = 1;
+  }
   const chaosAmt = getVal('chaos') / 100;
   const rotAmt = getVal('rotation') / 100;
   const scaleAmt = getVal('scale') / 100;
@@ -380,8 +387,8 @@ function draw() {
   const gW = W - pad * 2;
   const gH = H - pad * 2;
 
-  // ─── special case: cols or rows is 0, draw only outer rectangle ───
-  if (cols === 0 || rows === 0) {
+  // ─── special case: both cols AND rows are 0, draw only outer rectangle ───
+  if (bothZero) {
     ctx.beginPath();
     ctx.rect(pad, pad, gW, gH);
     ctx.strokeStyle = '#0e0e0c';
@@ -389,7 +396,7 @@ function draw() {
     ctx.lineWidth = lineWeight;
     ctx.stroke();
     document.getElementById('info').textContent =
-      `${cols} × ${rows} — empty frame`;
+      `0 × 0 — empty frame`;
     return;
   }
 
