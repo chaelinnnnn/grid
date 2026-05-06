@@ -10,7 +10,7 @@
   *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
   :root {
-    --bg: #f5f3ee;
+    --bg: #ffffff;
     --fg: #0e0e0c;
     --dim: #8a8880;
     --faint: #c8c6c0;
@@ -153,6 +153,7 @@
     max-width: 900px;
     width: 100%;
     cursor: crosshair;
+    background: #ffffff;
   }
 
   footer {
@@ -204,12 +205,12 @@
 <div class="controls">
   <div class="ctrl">
     <label>Cols</label>
-    <input type="range" id="cols" min="2" max="20" value="8" oninput="draw()">
+    <input type="range" id="cols" min="0" max="20" value="8" oninput="draw()">
     <span class="val" id="cols-v">8</span>
   </div>
   <div class="ctrl">
     <label>Rows</label>
-    <input type="range" id="rows" min="2" max="20" value="8" oninput="draw()">
+    <input type="range" id="rows" min="0" max="20" value="8" oninput="draw()">
     <span class="val" id="rows-v">8</span>
   </div>
   <div class="ctrl">
@@ -242,6 +243,11 @@
     <input type="range" id="fill" min="0" max="100" value="0" oninput="draw()">
     <span class="val" id="fill-v">0</span>
   </div>
+  <div class="ctrl">
+    <label>Empty cells</label>
+    <input type="range" id="empty" min="0" max="100" value="0" oninput="draw()">
+    <span class="val" id="empty-v">0</span>
+  </div>
 </div>
 
 <div class="canvas-wrap">
@@ -259,6 +265,9 @@ let animFrame = null;
 let animating = false;
 let animT = 0;
 let seed = Math.random() * 10000;
+
+// color palette for interior lines
+const COLORS = ['#0e0e0c', '#e63946', '#2a9d3f', '#1d6feb'];
 
 function seededRnd(s) {
   const x = Math.sin(s) * 10000;
@@ -283,15 +292,16 @@ function preset(name) {
   document.querySelectorAll('.presets button').forEach(b => b.classList.remove('active'));
   event.target.classList.add('active');
   const p = {
-    order:    { cols:8, rows:8, chaos:0,  rotation:0,  scale:0,  opacity:0,  weight:5,  fill:0  },
-    tension:  { cols:8, rows:8, chaos:18, rotation:15, scale:20, opacity:10, weight:5,  fill:5  },
-    fracture: { cols:8, rows:8, chaos:45, rotation:40, scale:50, opacity:30, weight:8,  fill:15 },
-    collapse: { cols:8, rows:8, chaos:80, rotation:75, scale:70, opacity:60, weight:12, fill:30 },
-    after:    { cols:6, rows:6, chaos:25, rotation:20, scale:30, opacity:20, weight:4,  fill:60 },
+    order:    { cols:8, rows:8, chaos:0,  rotation:0,  scale:0,  opacity:0,  weight:5,  fill:0,  empty:0  },
+    tension:  { cols:8, rows:8, chaos:18, rotation:15, scale:20, opacity:10, weight:5,  fill:5,  empty:10 },
+    fracture: { cols:8, rows:8, chaos:45, rotation:40, scale:50, opacity:30, weight:8,  fill:15, empty:25 },
+    collapse: { cols:8, rows:8, chaos:80, rotation:75, scale:70, opacity:60, weight:12, fill:30, empty:40 },
+    after:    { cols:6, rows:6, chaos:25, rotation:20, scale:30, opacity:20, weight:4,  fill:60, empty:35 },
   };
   const s = p[name];
   for (const [k, v] of Object.entries(s)) {
-    document.getElementById(k).value = v;
+    const el = document.getElementById(k);
+    if (el) el.value = v;
   }
   seed = Math.random() * 10000;
   draw();
@@ -304,6 +314,7 @@ function randomizeAll() {
   document.getElementById('opacity').value = Math.random() * 100;
   document.getElementById('fill').value = Math.random() * 80;
   document.getElementById('weight').value = Math.random() * 25 + 2;
+  document.getElementById('empty').value = Math.random() * 50;
   seed = Math.random() * 10000;
   draw();
 }
@@ -316,8 +327,6 @@ function animate() {
   }
   animating = true;
   animT = 0;
-  const startChaos = parseFloat(document.getElementById('chaos').value);
-  const startRot = parseFloat(document.getElementById('rotation').value);
 
   function step() {
     if (!animating) return;
@@ -334,9 +343,14 @@ function animate() {
   step();
 }
 
-function draw() {
-  if (animating) {} 
+// pick a color from COLORS that's different from the neighbors' colors
+function pickColor(s, neighbors) {
+  const available = COLORS.filter(c => !neighbors.includes(c));
+  if (available.length === 0) return COLORS[Math.floor(seededRnd(s) * COLORS.length)];
+  return available[Math.floor(seededRnd(s) * available.length)];
+}
 
+function draw() {
   const canvas = document.getElementById('c');
   const wrap = canvas.parentElement;
   const W = Math.min(wrap.offsetWidth - 56, 900);
@@ -356,12 +370,29 @@ function draw() {
   const opacityAmt = getVal('opacity') / 100;
   const lineWeight = getVal('weight') / 10;
   const fillAmt = getVal('fill') / 100;
+  const emptyAmt = getVal('empty') / 100;
 
-  ctx.clearRect(0, 0, W, H);
+  // fill background pure white
+  ctx.fillStyle = '#ffffff';
+  ctx.fillRect(0, 0, W, H);
 
   const pad = 30;
   const gW = W - pad * 2;
   const gH = H - pad * 2;
+
+  // ─── special case: cols or rows is 0, draw only outer rectangle ───
+  if (cols === 0 || rows === 0) {
+    ctx.beginPath();
+    ctx.rect(pad, pad, gW, gH);
+    ctx.strokeStyle = '#0e0e0c';
+    ctx.globalAlpha = 1;
+    ctx.lineWidth = lineWeight;
+    ctx.stroke();
+    document.getElementById('info').textContent =
+      `${cols} × ${rows} — empty frame`;
+    return;
+  }
+
   const cellW = gW / cols;
   const cellH = gH / rows;
 
@@ -379,10 +410,81 @@ function draw() {
     }
   }
 
+  // determine which cells are "empty" (no surrounding lines drawn)
+  const cellEmpty = [];
+  for (let r = 0; r < rows; r++) {
+    cellEmpty.push([]);
+    for (let c = 0; c < cols; c++) {
+      const si = seed + r * 100 + c + 9000;
+      cellEmpty[r].push(seededRnd(si * 4.7) < emptyAmt);
+    }
+  }
+
+  // ─── color assignment for interior lines ───
+  // horizontal segment at [r][c] = top edge of cell (r,c)
+  // vertical segment at [r][c] = left edge of cell (r,c)
+  // outer border lines (r=0 top, r=rows bottom, c=0 left, c=cols right) = always black
+  // interior lines: pick color avoiding adjacent interior segment colors
+
+  const hColors = []; // hColors[r][c] for r=0..rows, c=0..cols-1
+  const vColors = []; // vColors[r][c] for r=0..rows-1, c=0..cols
+
+  // initialize
+  for (let r = 0; r <= rows; r++) {
+    hColors.push(new Array(cols).fill(null));
+  }
+  for (let r = 0; r < rows; r++) {
+    vColors.push(new Array(cols + 1).fill(null));
+  }
+
+  // fill in colors — outer = black, inner = color avoiding adjacent
+  // horizontal lines
+  for (let r = 0; r <= rows; r++) {
+    for (let c = 0; c < cols; c++) {
+      if (r === 0 || r === rows) {
+        hColors[r][c] = '#0e0e0c';
+      } else {
+        // neighbors: same row left/right, adjacent verticals at endpoints
+        const neighbors = [];
+        if (c > 0 && hColors[r][c-1]) neighbors.push(hColors[r][c-1]);
+        // verticals touching left endpoint (r,c) of this h-segment
+        // left endpoint at node[r][c]: connects v[r-1][c] (above) and v[r][c] (below)
+        if (r-1 >= 0 && vColors[r-1] && vColors[r-1][c]) neighbors.push(vColors[r-1][c]);
+        if (r < rows && vColors[r] && vColors[r][c]) neighbors.push(vColors[r][c]);
+        // right endpoint at node[r][c+1]: connects v[r-1][c+1] and v[r][c+1]
+        if (r-1 >= 0 && vColors[r-1] && vColors[r-1][c+1]) neighbors.push(vColors[r-1][c+1]);
+        if (r < rows && vColors[r] && vColors[r][c+1]) neighbors.push(vColors[r][c+1]);
+        const si = seed + r * 100 + c + 1000;
+        hColors[r][c] = pickColor(si * 1.7, neighbors);
+      }
+    }
+  }
+
+  // vertical lines
+  for (let r = 0; r < rows; r++) {
+    for (let c = 0; c <= cols; c++) {
+      if (c === 0 || c === cols) {
+        vColors[r][c] = '#0e0e0c';
+      } else {
+        const neighbors = [];
+        if (r > 0 && vColors[r-1][c]) neighbors.push(vColors[r-1][c]);
+        // horizontals touching top endpoint node[r][c]: h[r][c-1] (left) and h[r][c] (right)
+        if (c-1 >= 0 && hColors[r] && hColors[r][c-1]) neighbors.push(hColors[r][c-1]);
+        if (c < cols && hColors[r] && hColors[r][c]) neighbors.push(hColors[r][c]);
+        // bottom endpoint node[r+1][c]: h[r+1][c-1] and h[r+1][c]
+        if (c-1 >= 0 && hColors[r+1] && hColors[r+1][c-1]) neighbors.push(hColors[r+1][c-1]);
+        if (c < cols && hColors[r+1] && hColors[r+1][c]) neighbors.push(hColors[r+1][c]);
+        const si = seed + r * 100 + c + 2000;
+        vColors[r][c] = pickColor(si * 2.3, neighbors);
+      }
+    }
+  }
+
   // draw cell fills
   if (fillAmt > 0) {
     for (let r = 0; r < rows; r++) {
       for (let c = 0; c < cols; c++) {
+        if (cellEmpty[r][c]) continue;
         const si = seed + r * 100 + c + 500;
         const cellFill = seededRnd(si * 3.7) * fillAmt;
         if (cellFill > 0.05) {
@@ -405,20 +507,37 @@ function draw() {
     }
   }
 
+  // helper: should a horizontal line at (r, c) be drawn?
+  // it's drawn if at least one of its adjacent cells is NOT empty,
+  // OR if it's an outer border line
+  function shouldDrawH(r, c) {
+    if (r === 0 || r === rows) return true; // outer border always drawn
+    const above = (r > 0) ? !cellEmpty[r-1][c] : false;
+    const below = (r < rows) ? !cellEmpty[r][c] : false;
+    return above || below;
+  }
+  function shouldDrawV(r, c) {
+    if (c === 0 || c === cols) return true;
+    const left = (c > 0) ? !cellEmpty[r][c-1] : false;
+    const right = (c < cols) ? !cellEmpty[r][c] : false;
+    return left || right;
+  }
+
   // draw grid lines
   for (let r = 0; r <= rows; r++) {
     for (let c = 0; c <= cols; c++) {
       const si = seed + r * 100 + c;
       const baseOpacity = 1 - opacityAmt * seededRnd(si * 5.1) * 0.9;
+      const isOuterRow = (r === 0 || r === rows);
+      const isOuterCol = (c === 0 || c === cols);
 
       // horizontal line
-      if (c < cols) {
+      if (c < cols && shouldDrawH(r, c)) {
         const n1 = nodes[r][c];
         const n2 = nodes[r][c+1];
 
-        // scale variation on individual segments
         let sx1 = n1.x, sy1 = n1.y, sx2 = n2.x, sy2 = n2.y;
-        if (scaleAmt > 0) {
+        if (scaleAmt > 0 && !isOuterRow) {
           const cx = (sx1 + sx2) / 2;
           const cy = (sy1 + sy2) / 2;
           const sv = 1 - scaleAmt * seededRnd(si * 7.3) * 0.6;
@@ -428,8 +547,7 @@ function draw() {
           sy2 = cy + (sy2 - cy) * sv;
         }
 
-        // rotation on segment
-        if (rotAmt > 0) {
+        if (rotAmt > 0 && !isOuterRow) {
           const cx = (sx1 + sx2) / 2;
           const cy = (sy1 + sy2) / 2;
           const angle = rnd2(si * 9.1, Math.PI * 0.5 * rotAmt);
@@ -444,20 +562,21 @@ function draw() {
         ctx.beginPath();
         ctx.moveTo(sx1, sy1);
         ctx.lineTo(sx2, sy2);
-        ctx.strokeStyle = '#0e0e0c';
-        ctx.globalAlpha = Math.max(0.04, baseOpacity);
+        ctx.strokeStyle = hColors[r][c];
+        ctx.globalAlpha = isOuterRow ? 1 : Math.max(0.1, baseOpacity);
         ctx.lineWidth = lineWeight;
+        ctx.lineCap = 'butt';
         ctx.stroke();
         ctx.globalAlpha = 1;
       }
 
       // vertical line
-      if (r < rows) {
+      if (r < rows && shouldDrawV(r, c)) {
         const n1 = nodes[r][c];
         const n2 = nodes[r+1][c];
 
         let sx1 = n1.x, sy1 = n1.y, sx2 = n2.x, sy2 = n2.y;
-        if (scaleAmt > 0) {
+        if (scaleAmt > 0 && !isOuterCol) {
           const cx = (sx1 + sx2) / 2;
           const cy = (sy1 + sy2) / 2;
           const sv = 1 - scaleAmt * seededRnd((si+50) * 7.3) * 0.6;
@@ -467,7 +586,7 @@ function draw() {
           sy2 = cy + (sy2 - cy) * sv;
         }
 
-        if (rotAmt > 0) {
+        if (rotAmt > 0 && !isOuterCol) {
           const cx = (sx1 + sx2) / 2;
           const cy = (sy1 + sy2) / 2;
           const angle = rnd2((si+50) * 9.1, Math.PI * 0.5 * rotAmt);
@@ -482,9 +601,10 @@ function draw() {
         ctx.beginPath();
         ctx.moveTo(sx1, sy1);
         ctx.lineTo(sx2, sy2);
-        ctx.strokeStyle = '#0e0e0c';
-        ctx.globalAlpha = Math.max(0.04, baseOpacity);
+        ctx.strokeStyle = vColors[r][c];
+        ctx.globalAlpha = isOuterCol ? 1 : Math.max(0.1, baseOpacity);
         ctx.lineWidth = lineWeight;
+        ctx.lineCap = 'butt';
         ctx.stroke();
         ctx.globalAlpha = 1;
       }
@@ -492,7 +612,7 @@ function draw() {
   }
 
   document.getElementById('info').textContent =
-    `${cols} × ${rows} — chaos ${Math.round(chaosAmt*100)}% — seed ${Math.round(seed)}`;
+    `${cols} × ${rows} — chaos ${Math.round(chaosAmt*100)}% — empty ${Math.round(emptyAmt*100)}% — seed ${Math.round(seed)}`;
 }
 
 function saveImage() {
