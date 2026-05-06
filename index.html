@@ -480,6 +480,24 @@ function draw() {
     }
   }
 
+  // ─── color assignment for cell fills ───
+  // each cell picks a color avoiding its already-assigned neighbors (left, top)
+  const cellColors = [];
+  for (let r = 0; r < rows; r++) {
+    cellColors.push([]);
+    for (let c = 0; c < cols; c++) {
+      if (cellEmpty[r][c]) {
+        cellColors[r].push(null);
+        continue;
+      }
+      const neighbors = [];
+      if (c > 0 && cellColors[r][c-1]) neighbors.push(cellColors[r][c-1]);
+      if (r > 0 && cellColors[r-1][c]) neighbors.push(cellColors[r-1][c]);
+      const si = seed + r * 100 + c + 7000;
+      cellColors[r].push(pickColor(si * 4.1, neighbors));
+    }
+  }
+
   // draw cell fills
   if (fillAmt > 0) {
     for (let r = 0; r < rows; r++) {
@@ -498,8 +516,8 @@ function draw() {
           ctx.lineTo(br.x, br.y);
           ctx.lineTo(bl.x, bl.y);
           ctx.closePath();
-          ctx.fillStyle = '#0e0e0c';
-          ctx.globalAlpha = cellFill * 0.12;
+          ctx.fillStyle = cellColors[r][c];
+          ctx.globalAlpha = cellFill * 0.5;
           ctx.fill();
           ctx.globalAlpha = 1;
         }
